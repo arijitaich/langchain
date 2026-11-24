@@ -1,8 +1,11 @@
 from collections.abc import AsyncIterator, Iterable
 from typing import TypeVar
 
+import pytest
+
 from langchain_core.output_parsers.list import (
     CommaSeparatedListOutputParser,
+    ListOutputParser,
     MarkdownListOutputParser,
     NumberedListOutputParser,
 )
@@ -160,6 +163,27 @@ def test_markdown_list() -> None:
         assert list(parser.transform(iter([text]))) == expectedlist
 
 
+CRLF_CASES = [
+    (NumberedListOutputParser(), "1. apple\r\n2. banana\r\n3. cherry\r\n"),
+    (MarkdownListOutputParser(), "- apple\r\n- banana\r\n- cherry\r\n"),
+    (MarkdownListOutputParser(), "Items:\r\n* apple\r\n   * banana\r\n* cherry"),
+]
+
+
+@pytest.mark.parametrize(("parser", "text"), CRLF_CASES)
+def test_list_parsers_crlf(parser: ListOutputParser, text: str) -> None:
+    """CRLF line endings must not leave a trailing carriage return on items."""
+    expected = ["apple", "banana", "cherry"]
+    expectedlist = [[a] for a in expected]
+
+    assert parser.parse(text) == expected
+    assert list(parser.transform(iter(text))) == expectedlist
+    assert list(parser.transform(iter(text.splitlines(keepends=True)))) == (
+        expectedlist
+    )
+    assert list(parser.transform(iter([text]))) == expectedlist
+
+
 T = TypeVar("T")
 
 
@@ -312,3 +336,20 @@ async def test_markdown_list_async() -> None:
         assert [
             a async for a in parser.atransform(aiter_from_iter([text]))
         ] == expectedlist
+
+
+@pytest.mark.parametrize(("parser", "text"), CRLF_CASES)
+async def test_list_parsers_crlf_async(parser: ListOutputParser, text: str) -> None:
+    """CRLF line endings must not leave a trailing carriage return on items."""
+    expected = ["apple", "banana", "cherry"]
+    expectedlist = [[a] for a in expected]
+
+    assert await parser.aparse(text) == expected
+    assert [a async for a in parser.atransform(aiter_from_iter(text))] == expectedlist
+    assert [
+        a
+        async for a in parser.atransform(
+            aiter_from_iter(text.splitlines(keepends=True))
+        )
+    ] == expectedlist
+    assert [a async for a in parser.atransform(aiter_from_iter([text]))] == expectedlist

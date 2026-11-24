@@ -184,7 +184,7 @@ class LLMToolEmulator(AgentMiddleware[AgentState[Any], ContextT], Generic[Contex
 
         # Short-circuit: return emulated result without executing real tool
         return ToolMessage(
-            content=response.content,
+            content=response.text,
             tool_call_id=request.tool_call["id"],
             name=tool_name,
         )
@@ -242,7 +242,7 @@ class LLMToolEmulator(AgentMiddleware[AgentState[Any], ContextT], Generic[Contex
 
         # Short-circuit: return emulated result without executing real tool
         return ToolMessage(
-            content=response.content,
+            content=response.text,
             tool_call_id=request.tool_call["id"],
             name=tool_name,
         )

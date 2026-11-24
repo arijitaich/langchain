@@ -832,3 +832,66 @@ def test_emulation_call_stays_off_the_messages_stream() -> None:
 
     assert [part.text for part in parts if isinstance(part, ToolMessage)] == ["EMULATED-WEATHER"]
     assert "".join(part.text for part in parts if isinstance(part, AIMessage)) == "Done."
+
+
+class TestLLMToolEmulatorContentBlocks:
+    """Emulator models that return content blocks (e.g. reasoning) produce text only."""
+
+    @staticmethod
+    def _emulator_model() -> GenericFakeChatModel:
+        return GenericFakeChatModel(
+            messages=iter(
+                [
+                    AIMessage(
+                        content=[
+                            {
+                                "type": "thinking",
+                                "thinking": "Make up a plausible forecast.",
+                                "signature": "sig",
+                            },
+                            {"type": "text", "text": "Sunny, 18C"},
+                        ]
+                    )
+                ]
+            )
+        )
+
+    @staticmethod
+    def _agent_model() -> FakeModel:
+        return FakeModel(
+            messages=iter(
+                [
+                    AIMessage(
+                        content="",
+                        tool_calls=[
+                            {"name": "get_weather", "id": "1", "args": {"location": "Paris"}}
+                        ],
+                    ),
+                    AIMessage(content="It's sunny."),
+                ]
+            )
+        )
+
+    def test_tool_message_contains_only_text(self) -> None:
+        agent = create_agent(
+            model=self._agent_model(),
+            tools=[get_weather],
+            middleware=[LLMToolEmulator(model=self._emulator_model())],
+        )
+
+        result = agent.invoke({"messages": [HumanMessage("What's the weather in Paris?")]})
+
+        tool_message = next(m for m in result["messages"] if isinstance(m, ToolMessage))
+        assert tool_message.content == "Sunny, 18C"
+
+    async def test_async_tool_message_contains_only_text(self) -> None:
+        agent = create_agent(
+            model=self._agent_model(),
+            tools=[get_weather],
+            middleware=[LLMToolEmulator(model=self._emulator_model())],
+        )
+
+        result = await agent.ainvoke({"messages": [HumanMessage("What's the weather in Paris?")]})
+
+        tool_message = next(m for m in result["messages"] if isinstance(m, ToolMessage))
+        assert tool_message.content == "Sunny, 18C"

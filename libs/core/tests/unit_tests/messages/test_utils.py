@@ -2689,6 +2689,51 @@ def test_get_buffer_string_xml_no_truncation_under_limit() -> None:
     assert "..." not in result
 
 
+def test_get_buffer_string_xml_refusal_block() -> None:
+    """Refusal content blocks are kept in XML format."""
+    messages: list[BaseMessage] = [
+        HumanMessage(content="Help me with something"),
+        AIMessage(content=[{"type": "refusal", "refusal": "I won't do <that>."}]),
+    ]
+    result = get_buffer_string(messages, format="xml")
+    assert result == (
+        '<message type="human">Help me with something</message>\n'
+        '<message type="ai"><refusal>I won\'t do &lt;that&gt;.</refusal></message>'
+    )
+
+
+def test_get_buffer_string_xml_refusal_block_without_text() -> None:
+    """A refusal with no text still shows that the model refused."""
+    messages: list[BaseMessage] = [
+        AIMessage(content=[{"type": "refusal", "refusal": ""}]),
+    ]
+    result = get_buffer_string(messages, format="xml")
+    assert result == '<message type="ai"><refusal /></message>'
+
+
+def test_get_buffer_string_xml_openai_refusal_in_additional_kwargs() -> None:
+    """OpenAI chat completions refusals live in `additional_kwargs`."""
+    messages: list[BaseMessage] = [
+        AIMessage(content="", additional_kwargs={"refusal": "I can't help with that."}),
+    ]
+    result = get_buffer_string(messages, format="xml")
+    assert result == (
+        '<message type="ai"><refusal>I can\'t help with that.</refusal></message>'
+    )
+
+
+def test_get_buffer_string_xml_refusal_not_duplicated() -> None:
+    """A refusal in both content and `additional_kwargs` is written once."""
+    messages: list[BaseMessage] = [
+        AIMessage(
+            content=[{"type": "refusal", "refusal": "No."}],
+            additional_kwargs={"refusal": "No."},
+        ),
+    ]
+    result = get_buffer_string(messages, format="xml")
+    assert result.count("<refusal>") == 1
+
+
 def test_get_buffer_string_custom_system_prefix() -> None:
     """Test `get_buffer_string` with custom `system_prefix`."""
     messages: list[BaseMessage] = [

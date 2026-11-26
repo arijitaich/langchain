@@ -171,6 +171,11 @@ def _format_content_block_xml(block: dict[str, Any]) -> str | None:
             return f"<reasoning>{escape(reasoning)}</reasoning>"
         return None
 
+    # Refusal blocks (Anthropic refusals can have no text)
+    if block_type == "refusal":
+        refusal = block.get("refusal", "")
+        return f"<refusal>{escape(refusal)}</refusal>" if refusal else "<refusal />"
+
     # Image blocks (URL only, base64 already filtered)
     if block_type == "image":
         url = block.get("url")
@@ -463,6 +468,19 @@ def get_buffer_string(
                         formatted = _format_content_block_xml(block)
                         if formatted:
                             content_parts.append(formatted)
+
+            # OpenAI chat completions put refusals in `additional_kwargs`
+            refusal = m.additional_kwargs.get("refusal")
+            if (
+                isinstance(m, AIMessage)
+                and isinstance(refusal, str)
+                and refusal
+                and not any(
+                    isinstance(block, dict) and block.get("type") == "refusal"
+                    for block in m.content
+                )
+            ):
+                content_parts.append(f"<refusal>{escape(refusal)}</refusal>")
 
             # Check if this is an AIMessage with tool calls
             has_tool_calls = isinstance(m, AIMessage) and m.tool_calls
